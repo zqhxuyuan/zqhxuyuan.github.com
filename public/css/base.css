@@ -103,13 +103,13 @@ body, html {
   line-height: 1.42857143;
 }
 #content {
-  font-size: 15px;
+  font-size: 14px;
 }
 #content h2, h3 {
   line-height: 2;
 }
 blockquote p {
-  font-size: 16px;
+  font-size: 15px;
 }
 /* 其他配置 */
 .center {
