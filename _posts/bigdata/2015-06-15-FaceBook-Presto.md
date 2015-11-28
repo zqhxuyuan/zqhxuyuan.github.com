@@ -9,17 +9,15 @@ layout: post
 **安装前提**:  按照<http://prestodb.io/overview.html>要求jdk必须是1.8, 否则启动会报错版本不匹配.
 
 ### 配置文件
-在presto-server安装目录下新建etc目录, 并新建以下配置文件和catalog目录
+在presto-server安装目录下新建etc目录, 并新建以下配置文件和catalog目录  
 
-
-|配置文件|配置项|说明|
-|--------|----|---|
+|File|Config|Tip|
+|----|------|---|
 |config.properties|coordinator=true<br> datasources=jmx<br>node-scheduler.include-coordinator=true<br>http-server.http.port=8080<br>task.max-memory=1GB<br>discovery-server.enabled=true<br>discovery.uri=http://localhost:8080|Presto 服务配置|
 |jvm.config|-server<br>-Xmx4G<br>-XX:+UseConcMarkSweepGC<br>-XX:+ExplicitGCInvokesConcurrent<br>-XX:+CMSClassUnloadingEnabled<br>-XX:+AggressiveOpts<br>-XX:+HeapDumpOnOutOfMemoryError<br>-XX:OnOutOfMemoryError=kill -9 %p<br>-XX:PermSize=150M<br>-XX:MaxPermSize=150M<br>-XX:ReservedCodeCacheSize=150M|JVM命令行选项|
 |log.properties|com.facebook.presto=INFO|日志信息|
 |node.properties|node.environment=production<br>node.id=ffffffff-ffff-ffff-ffff-ffffffffffff<br>node.data-dir=/home/hadoop/data/presto/data|环境变量配置,每个节点特定配置|
 |catalog/jmx.properties|connector.name=jmx|每个连接者配置(data sources)|
-
 
 
 数据源(上面的jmx.properties配置文件的connector.name)可以选择jmx, hive等.   
@@ -45,13 +43,17 @@ hadoop@hadoop:~/soft/presto-server-0.89$ bin/launcher run
 2015-01-09T10:03:27.784+0800	ERROR	Discovery-0	io.airlift.discovery.client.CachingServiceSelector	Cannot connect to discovery server for refresh (collector/general): Lookup of collector failed for http://localhost:8080/v1/service/collector/general
 2015-01-09T10:03:27.800+0800	ERROR	Discovery-0	io.airlift.discovery.client.CachingServiceSelector	Cannot connect to discovery server for refresh (presto/general): Lookup of presto failed for http://localhost:8080/v1/service/presto/general
 ```
+
 ### 命令行接口
+
 <http://prestodb.io/docs/current/installation/cli.html> 
 
 ```
 hadoop@hadoop:~/install/bigdata/nosql$ ln -s presto-cli-0.89-executable.jar presto-cli
 ```
+
 ## jmx connection
+
 <http://prestodb.io/docs/current/connector/jmx.html> 
 
 ```
@@ -117,6 +119,7 @@ presto也提供了一个web ui
 ![](http://7xjs7x.com1.z0.glb.clouddn.com/presto-8.png)
 
 ### hive connection
+
 <http://prestodb.io/docs/current/connector/hive.html> 
 
 修改presto的配置文件config.properties,并添加catalog/hive.properties文件,使其连接hive

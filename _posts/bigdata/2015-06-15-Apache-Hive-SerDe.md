@@ -2,7 +2,8 @@
 layout: post
 ---
 
-### hive使用文本文件
+### hive使用文本文件  
+
 ```
 $ cat hello.txt
 a	b	c

@@ -19,7 +19,8 @@ public ResultSet execute(Statement statement) {
 
 ### 异步+不能中断
 
-executeAsync是异步执行的(AbstractSession):
+executeAsync是异步执行的(AbstractSession):  
+
 ```java
 public ResultSetFuture executeAsync(Statement statement) {
     return executeQuery(makeRequestMessage(statement, null), statement);
@@ -27,6 +28,7 @@ public ResultSetFuture executeAsync(Statement statement) {
 ```
 
 但是却是Uninterrupted不能中断的: 等待结果返回是不能中断的(DefaultResultSetFuture).   
+
 ```java
     /**
      * Waits for the query to return and return its result.
@@ -52,7 +54,8 @@ public ResultSetFuture executeAsync(Statement statement) {
     }    
 ```
 
-Uninterrupted的实现: 
+Uninterrupted的实现:  
+
 ```java
   public static <V> V getUninterruptibly(Future<V> future) throws ExecutionException {
     boolean interrupted = false;
@@ -79,7 +82,8 @@ Uninterrupted的实现:
 
 ### 带超时的Future
 
-DefaultResultSetFuture还提供了一个带超时的Future:
+DefaultResultSetFuture还提供了一个带超时的Future:  
+
 ```java
     //Waits for the provided time for the query to return and return its result if available.
     public ResultSet getUninterruptibly(long timeout, TimeUnit unit) throws TimeoutException {
@@ -92,6 +96,7 @@ DefaultResultSetFuture还提供了一个带超时的Future:
 ```
 
 超时的控制通过将时间传入future, 如果到时间了还没有返回值, 则中断:  
+
 ```java
   public static <V> V getUninterruptibly(Future<V> future, long timeout,  TimeUnit unit) throws ExecutionException, TimeoutException {
     boolean interrupted = false;
@@ -124,6 +129,7 @@ DefaultResultSetFuture还提供了一个带超时的Future:
 
 DefaultResultSetFuture的cancel上说明了怎么使用Timeout:  
 但是这种方式只是取消客户端查询,并不会取消在Cassandra服务端已经开始的请求.  
+
 ```java
     /**
      * Attempts to cancel the execution of the request corresponding to this
@@ -168,6 +174,7 @@ DefaultResultSetFuture的cancel上说明了怎么使用Timeout:
 ```
 
 所以CassandraClient的查询可以改造成:  
+
 ```java
     //带超时的SQL
     public ResultSet getResultSetTimeout(BoundStatement bstmt) {

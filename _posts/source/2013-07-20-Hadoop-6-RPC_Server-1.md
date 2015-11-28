@@ -615,8 +615,6 @@ Listener的run方法会调用doAccept(), Listener.Reader的run方法会调用doR
     connection.readAndProcess();
 
 
-
-
 **Listener.doAccept()接受连接过程**  
 从readers池中获得一个reader线程  
 reader.startAdd(); 激活readSelector, 设置adding为true --> 读线程监听客户端的数据写入,如果adding=true,表示Reader正在添加,再等待一秒钟  

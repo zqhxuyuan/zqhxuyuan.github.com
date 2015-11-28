@@ -22,6 +22,7 @@ $ mvn clean package
 $ mkdir -p deploy/samza
 $ tar -xvf ./target/hello-samza-0.8.0-dist.tar.gz -C deploy/samza
 ```
+
 ### Run a Samza Job
 
 After you've built your Samza package, you can start a job on the grid using the run-job.sh script.  

@@ -234,8 +234,8 @@ Java RPC的getProxy方法接收Class<T> clazz, 获得的代理类转型为T
 ```
 
 
-客户端代码调用:   	Echo echo = RPC.getProxy(Echo.class, "127.0.0.1", 20382);  
-所以实际上等价于: 	Echo echo = (Echo)Proxy.newProxyInstance(loader, new Class[] {Echo.class}, handler);  
+客户端代码调用:   `Echo echo = RPC.getProxy(Echo.class, "127.0.0.1", 20382);`  
+所以实际上等价于: 	`Echo echo = (Echo)Proxy.newProxyInstance(loader, new Class[] {Echo.class}, handler);`  
 
 因为Proxy.newProxyInstance的第二个参数需要接口类型, 所以getProxy方法(仅仅是一个帮助方法, 可以不用getProxy, 直接使用Proxy.newProxyInstance  
 比如Java动态代理)需要传递一个接口类型. 传递的接口类型(.class)就是Proxy.newProxyInstance的返回值, 表示代理类是对该接口的一个代理.  
@@ -261,7 +261,6 @@ Hadoop的getProxy的参数类型是Class<? extends VersionedProtocol> protocol, 
       return (ClientProtocol) Proxy.newProxyInstance(RPC.class.getClassLoader(), new Class[] {ClientProtocol.class}, handler);
     }
 ```
-
 
 因为Hadoop的通信有很多接口, 比如DatanodeProtocol, ClientDatanodeProtocol等, 如果针对每个接口类型都写一个这样的方法也是可以的,  
 为了统一Hadoop就设计了VersionedProtocol协议接口, 所有的协议都继承该接口, 同时RPC.getProxy也可以设计成统一的Class<? extends VersionedProtocol>  

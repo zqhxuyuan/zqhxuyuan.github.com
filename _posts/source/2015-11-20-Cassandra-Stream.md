@@ -10,6 +10,8 @@ description:
 ## sstableloader流程
 
 BulkLoader主方法创建SSTableLoader,调用stream开始流式传输:  
+
+
 ```java
     //Future操作,非阻塞的. 把长时间执行的任务封装在Future里, 程序主逻辑继续往下执行, 通过future.get获取结果
     StreamResultFuture future = loader.stream(options.ignores);
@@ -18,6 +20,7 @@ BulkLoader主方法创建SSTableLoader,调用stream开始流式传输:
 ```
 
 SSTableLoader.stream方法返回Future才能让调用者在Future上调用get.  
+
 ```java
     public StreamResultFuture stream(Set<InetAddress> toIgnore, StreamEventHandler... listeners) {
         //初始化, 客户端为BulkLoader创建的ExternalClient. 
@@ -49,6 +52,7 @@ SSTableLoader.stream方法返回Future才能让调用者在Future上调用get.
 ```
 
 先调用StreamPlan的transferFiles, 等所有endpoints都遍历完才开始execute. 在transferFiles会准备一些execute必备的数据比如sessions.  
+
 ```java
     public StreamPlan transferFiles(InetAddress to, Collection<StreamSession.SSTableStreamingSections> sstableDetails) {
         //节点to对应的Session如果已经存在则直接获取,没有就创建
@@ -72,6 +76,7 @@ SSTableLoader.stream方法返回Future才能让调用者在Future上调用get.
 ```
 
 StreamPlan.execute返回的是一个全局唯一的StreamResultFuture,基于Future.  
+
 ```java
     public StreamResultFuture execute() {
         //只有一个StreamPlan,但是有好多个StreamSession. 要开始一起开始吧
@@ -80,6 +85,7 @@ StreamPlan.execute返回的是一个全局唯一的StreamResultFuture,基于Futu
 ```
 
 初始化StreamResultFuture会创建StreamResultFuture并注册到StreamManager,然后把它传递给所有StreamSession的初始化方法, 最后启动每个StreamSession:  
+
 ```java
     //初始化异步返回结果器. 一个StreamPlan只有一个StreamResultFuture,有多个StreamSessions, 所有的StreamSessions共用一个StreamResultFuture
     //因为一次Stream只需要最后的一个结果来表示所有(节点)的StreamSession是否都已经完成. 一个StreamSession对应一个节点的传输.
@@ -106,6 +112,7 @@ StreamPlan.execute返回的是一个全局唯一的StreamResultFuture,基于Futu
 ```
 
 由于在execute前已经transferFiles,所以每个StreamSession的transfers都是有数据的,当然也可能是requests. 然后用线程池启动任务 
+
 ```java
     public void start() {
         //请求或者传输必选其一,否则说明这个Session已经完成了
@@ -125,6 +132,7 @@ StreamPlan.execute返回的是一个全局唯一的StreamResultFuture,基于Futu
 ```
 
 初始化ConnectionHandler创建输入和输出的消息处理器. handler管理这两个线程.  
+
 ```java
     public void initiate() throws IOException {
         Socket incomingSocket = session.createConnection();
@@ -138,6 +146,7 @@ StreamPlan.execute返回的是一个全局唯一的StreamResultFuture,基于Futu
 ```
 
 输入和输出MessageHandler都继承MessageHandler抽象线程类,初始化时都发送InitMessage:    
+
 ```java
         public void sendInitMessage(Socket socket, boolean isForOutgoing) throws IOException {
             //创建初始化消息, 并转化为ByteBuffer, 由WriteChannel发送出去(即写入到WriteChannel中)
@@ -150,6 +159,7 @@ StreamPlan.execute返回的是一个全局唯一的StreamResultFuture,基于Futu
 ```
 
 初始化完毕StreamSession.start开始发送PREPARE准备消息:  
+
 ```java
     public void onInitializationComplete() {
         // send prepare message
@@ -172,6 +182,7 @@ StreamPlan.execute返回的是一个全局唯一的StreamResultFuture,基于Futu
 
 发送消息放到OutgoingMessageHandler.messageQueue队列中. 与此同时输出线程从队列中获取消息并序列化消息到out写入通道中:  
 StreamMessage是消息的抽象类,各类消息需要有自己的序列化实现器,因为不同类型的消息里面的内容是不一样的.  
+
 ```java
     //发送消息, 需要序列化消息
     private void sendMessage(WritableByteChannel out, StreamMessage message) {
@@ -180,6 +191,7 @@ StreamMessage是消息的抽象类,各类消息需要有自己的序列化实现
 ```
 
 现在假设往out发送了PrepareMessage消息, 与此同时ConnectionHandler的输入线程IncomingMessageHandler收到了这条消息进行反序列化:  
+
 ```java
     public void run() {
         ReadableByteChannel in = getReadChannel(socket);
@@ -195,6 +207,7 @@ StreamMessage是消息的抽象类,各类消息需要有自己的序列化实现
 ```
 
 StreamSession负责处理消息,如果是PrepareMessage,从中获取出附带的requests和transfers调用prepare方法:  
+
 ```java
     public void messageReceived(StreamMessage message) {
         switch (message.type) {
@@ -214,6 +227,7 @@ StreamSession负责处理消息,如果是PrepareMessage,从中获取出附带的
 ```
 
 PREPARE后就上开始传输文件了:  
+
 ```java
     private void startStreamingFiles() {
         streamResult.handleSessionPrepared(this);
@@ -230,6 +244,7 @@ PREPARE后就上开始传输文件了:
 ```
 
 在StreamPlan的transferFiless中会调用StreamSession.addTransferFiles将要传输的文件加入到StreamTransferTask:  
+
 ```java
     //为Session添加要传输的文件列表, 添加到TransferTask中
     public void addTransferFiles(Collection<SSTableStreamingSections> sstableDetails) {
@@ -253,6 +268,7 @@ PREPARE后就上开始传输文件了:
 
 传输文件的类型是OutgoingFileMessage, 所以上面startStreamingFiles开始传输的消息是Collection<OutgoingFileMessage>,  
 因为一个Task可以调用多次addTransferFile就有多个要传输的文件(上面的cfId是CF表的编号,则sstableloader一次一个表就只有一个StreamTransferTask了):     
+
 ```java
     public synchronized void addTransferFile(SSTableReader sstable, long estimatedKeys, List<Pair<Long, Long>> sections) {
         //每一个要传输的文件都包装成输出文件消息, 序列号可以表示文件编号,因为调用一次就增加1. 其他信息sstable,sections都是从一开始沿袭过来的.
@@ -262,6 +278,7 @@ PREPARE后就上开始传输文件了:
 ```
 
 OutgoingFileMessage的类型是FILE,对应messageReceived的会将消息转换为IncommingFileMessage并调用receive:  
+
 ```java
     public OutgoingFileMessage(SSTableReader sstable, int sequenceNumber, long estimatedKeys, List<Pair<Long, Long>> sections) {
         super(Type.FILE);
@@ -274,6 +291,7 @@ OutgoingFileMessage的类型是FILE,对应messageReceived的会将消息转换�
 + 输出消息OutgoingFileMessage的sstable是SSTableReader, 通过封装成StreamWriter输出.  
 + 读取消息IncomingFileMessage通过构造StreamReader读取输入流`reader.read(in)`最终形成SSTableWriter.  
 + `SSTableReader`和`SSTableWriter`均继承`SSTable`,用于读写SSTable文件, 但是`StreamReader`和`StreamWriter`提供的是流的读写/传输. 
+
 
 ```java
     //对输出消息进行序列化(output, write, serialize)
@@ -309,6 +327,7 @@ OutgoingFileMessage的类型是FILE,对应messageReceived的会将消息转换�
 |IncomingFileMessage|SSTableWriter|StreamReader|Input|deserialize|reader.read(in)
 
 StreamSession的receive将IncomingFileMessage转换为ReceivedMessage:   
+
 ```java
     public void receive(IncomingFileMessage message) {
         // send back file received message
@@ -320,6 +339,7 @@ StreamSession的receive将IncomingFileMessage转换为ReceivedMessage:
 receivers相关的StreamReceiveTask是在prepareReceiving创建并加入的(通过StreamSummary,即PREPARE附带的Summary信息).  
 接下来的流程交给了StreamReceiveTask.received方法, 而ReceivedMessage的处理是StreamTransferTask.complete发送方的工作接近完成了.  
 接收sstable文件的方式是用SSTableWriter关闭并打开SSTableReader, 加入到ColumnFamilyStore中,可能的话创建二级索引.  
+
 ```java
     public void run() {
         Pair<String, String> kscf = Schema.instance.getCF(task.cfId);
