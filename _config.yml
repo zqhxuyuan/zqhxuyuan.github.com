@@ -33,9 +33,8 @@ disqus:
 active: source
 
 # 首页除了最新文章外显示分类
-cates: 
-  - Optimization
-  - LaTeX
+#cates: 
+#  - BigData
 
 # 中文本地化
 locals:
