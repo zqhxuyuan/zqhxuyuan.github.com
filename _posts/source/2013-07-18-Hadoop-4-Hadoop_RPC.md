@@ -20,7 +20,8 @@ RPC.Server实现了org.apache.hadoop.ipc.Server, 你可以把一个对象, 通�
 下面进入RPC的源码分析, 以RPC中定义的顺序依次分析  
 ###Invocation
 作为客户端和服务器之间的传输介质,实现序列化, 包含了客户端要调用的方法名,参数类型,参数值.
-{% highlight java %}
+
+```
   /** A method invocation, including the method name and its parameters.*/
   private static class Invocation implements Writable, Configurable { //实现hadoop的序列化接口Writable,因为要在Client和Server之间传输该对象
     private String methodName;  		// The name of the method invoked.方法名 
@@ -54,13 +55,15 @@ RPC.Server实现了org.apache.hadoop.ipc.Server, 你可以把一个对象, 通�
       }
     } 
   }
-{% endhighlight %}
+```
+
 
 ![Invocation序列化](https://n4tfqg.blu.livefilestore.com/y2p4gJdamEnAr_JW3CU2SXem2pD1YTiYe0qnQDFNMeBuSusIcnVCBEze1EeDDfWqaxIXRhN2MX1Aw1edbpF7n217kKFCQZywGSgVZ6YJIHgHYrKIRX92GNAOhhB_wr9arBv/4-3%20Invocation%E5%BA%8F%E5%88%97%E5%8C%96.png?psid=1)  
 
 ###ClientCache
 定义了一个缓存Map. 通过客户端org.apache.hadoop.ipc.Client的SocketFactory可以快速取出对应的Client实例.   
-{% highlight java %}
+
+```
   /* Cache a client using its socket factory as the hash key */
   static private class ClientCache {
     private Map<SocketFactory, Client> clients = new HashMap<SocketFactory, Client>();
@@ -105,10 +108,12 @@ RPC.Server实现了org.apache.hadoop.ipc.Server, 你可以把一个对象, 通�
   static Client getClient(Configuration conf) { //for unit testing only
     return CLIENTS.getClient(conf);
   }
-{% endhighlight %}
+```
+
 
 ####Client.refCount
-{% highlight java %}
+
+```
   private int refCount = 1;
   private AtomicBoolean running = new AtomicBoolean(true); // if client runs
   private Hashtable<ConnectionId, Connection> connections = new Hashtable<ConnectionId, Connection>();
@@ -139,7 +144,8 @@ RPC.Server实现了org.apache.hadoop.ipc.Server, 你可以把一个对象, 通�
       }
     }
   }
-{% endhighlight %}
+```
+
 
 从前面的分析知道, 客户端通过getProxy()获得协议接口的代理类proxy: proxy在Client端,实现和协议相同的接口, proxy会(多次)调用协议接口的方法.  
 并不是一次调用了就结束了. 每一次调用都需要首先获得客户端对象, 这样在调用协议接口的方法时, 转到调用句柄的invoke方法时, 客户端通过IPC调用到Server的具体实现方法.  
@@ -149,7 +155,8 @@ RPC.Server实现了org.apache.hadoop.ipc.Server, 你可以把一个对象, 通�
 
 ###Invoker
 实现了java.lang.reflect.InvocationHandler接口, 是一个代理实例的调用句柄实现类  
-{% highlight java %}
+
+```
   private static class Invoker implements InvocationHandler {
     private Client.ConnectionId remoteId; 	// 远程服务器地址 
     private Client client; 					// 客户端实例 
@@ -175,7 +182,8 @@ RPC.Server实现了org.apache.hadoop.ipc.Server, 你可以把一个对象, 通�
       }
     }
   }
-{% endhighlight %}
+```
+
 
 在Java动态代理例子中客户端代码(不是指Client类, 而是DynamicProxyClient的main方法)通过调用getProxy获得代理类proxy, 当调用代理类proxy的方法时, 代理对象proxy会将方法调用转发给InvocationHandler的实现类的invoke方法. invoke()方法中里有这么一句: method.invoke(obj, args)通过反射调用obj类的method方法, 并传入参数args.  而上面(Hadoop RPC)和Java RPC的invoke()方法中却没有这一句, 取而代之的是client.call(new Invocation()).
 
@@ -188,7 +196,8 @@ Invoker的构造函数和invoke方法最好和RPC.getProxy方法一起分析, �
 我们先把Invoker.invoke方法里的client.call具体怎么进行网络通信的调用流程放在一边. 先来分析getProxy()  
 
 ###getProxy()
-{% highlight java %}
+
+```
   /** Construct a client-side proxy object that implements the named protocol,talking to a server at the named address. */
   public static VersionedProtocol getProxy(Class<? extends VersionedProtocol> protocol, long clientVersion, InetSocketAddress addr, 
  	  UserGroupInformation ticket, Configuration conf, SocketFactory factory, int rpcTimeout, RetryPolicy connectionRetryPolicy) throws IOException {
@@ -204,21 +213,26 @@ Invoker的构造函数和invoke方法最好和RPC.getProxy方法一起分析, �
       throw new VersionMismatch(protocol.getName(), clientVersion, serverVersion);
     }
   }
-{% endhighlight %}
+```
+
 
 **Class参数与返回值**  
 Java动态代理在客户端代码中获得的代理类转型为Subject:  
-{% highlight java %}
+
+```
     Class<?>[] interfaces = realSubject.getClass().getInterfaces(); // --> Subject.class
     Subject proxy = (Subject) Proxy.newProxyInstance(loader, interfaces, handler);
-{% endhighlight %}
+```
+
 
 Java RPC的getProxy方法接收Class<T> clazz, 获得的代理类转型为T  
-{% highlight java %}
+
+```
     public static <T> T getProxy(final Class<T> clazz,String host,int port) {
  		  return (T) Proxy.newProxyInstance(RPC.class.getClassLoader(), new Class[] {clazz}, handler);
     }
-{% endhighlight %}
+```
+
 
 客户端代码调用:   	Echo echo = RPC.getProxy(Echo.class, "127.0.0.1", 20382);  
 所以实际上等价于: 	Echo echo = (Echo)Proxy.newProxyInstance(loader, new Class[] {Echo.class}, handler);  
@@ -241,11 +255,13 @@ Hadoop的getProxy的参数类型是Class<? extends VersionedProtocol> protocol, 
 ![getProxy](https://n4tfqg.blu.livefilestore.com/y2pL_6fgoHWTDeQuaVie8BSbQjEGl48ijIjpvIgn9OCXLhOptkTcIj1u5Z69rvvU-67yFuEsWltQqskN1Z_jY2-11H6nl9xyzJBnGEO-mbhPcnm3JsdCq9H7UnAg5NhVbB_/4-4%20getProxy.png?psid=1)  
 
 传递ClientProtocol接口类型, 因为getProxy的返回类型是VersionedProtocol, 所以可以转型为ClientProtocol. 实际上该调用等价于:  
-{% highlight java %}
+
+```
     public static ClientProtocol getProxy(final Class ClientProtocol.class,String host,int port) {
       return (ClientProtocol) Proxy.newProxyInstance(RPC.class.getClassLoader(), new Class[] {ClientProtocol.class}, handler);
     }
-{% endhighlight %}
+```
+
 
 因为Hadoop的通信有很多接口, 比如DatanodeProtocol, ClientDatanodeProtocol等, 如果针对每个接口类型都写一个这样的方法也是可以的,  
 为了统一Hadoop就设计了VersionedProtocol协议接口, 所有的协议都继承该接口, 同时RPC.getProxy也可以设计成统一的Class<? extends VersionedProtocol>  
@@ -262,7 +278,8 @@ NameNode类并不存在在DFSClient相同的本地JVM上. 所以只能通过Name
 
 
 ###waitForProxy()
-{% highlight java %}
+
+```
   /** Get a proxy connection to a remote server 获取到一个到远程服务器的代理连接, 
    * 客户端调用该方法得到接口(协议接口)的代理对象(返回的是协议接口,实际得到的是协议接口的实现的一个代理, 面向接口编程), 
    * 然后利用该代理对象调用接口的方法(暴露给客户端的只是接口). 
@@ -289,11 +306,13 @@ NameNode类并不存在在DFSClient相同的本地JVM上. 所以只能通过Name
       } catch (InterruptedException ie) {} // IGNORE
     }
   }
-{% endhighlight %}
+```
+
 
 ###getServer() & RPC.Server
 在getProxy中我们说: Hadoop中RPC.getProxy()方法的调用者是客户端代码, RPC.getServer()方法的调用者在服务器端完成. 在比较Hadoop RPC和Java RPC中我们也对比了创建RPC Server的不同方式. 现在具体来看getServer是如何完成创建RPC服务器的操作的.
-{% highlight java %}
+
+```
   public static Server getServer(final Object instance, final String bindAddress, final int port, Configuration conf)throws IOException {
     return getServer(instance, bindAddress, port, 1, false, conf);
   }
@@ -335,7 +354,8 @@ NameNode类并不存在在DFSClient相同的本地JVM上. 所以只能通过Name
       this(instance, conf,  bindAddress, port, 1, false, null);
     }
   }
-{% endhighlight %}
+```
+
 
 仅仅通过上面的方法我们还不能确定Object instance对象到底是什么对象,实现类还是接口? 查看第三个getServer的调用树(前两个重载方法用于测试):
 ![getServer](https://n4tfqg.blu.livefilestore.com/y2puOQa85yN-APRhVn1TYxWf8YHS52A-6sDYUoycWrzOLxb2xed7XIXRZKoJegyICBw4-aonvWZ-JZJTSvJMZeHfrSjuq0_Gb8pi9f0N45u_dsod0ekSnm6jkle1pNxSFZL/4-5%20getServer.png?psid=1)  
@@ -343,7 +363,8 @@ NameNode类并不存在在DFSClient相同的本地JVM上. 所以只能通过Name
 
 **NameNode.getServer()**
 NameNode中有两个Server实例, 对于客户端的连接使用Server server, 对于DataNode的连接使用配置的serviceRpcServer. 由此可以看出NameNode的角色主要是作为一个RPC服务器, 用来接收客户端或者DataNode的连接请求. getServer的this参数指的是当前类的实例对象的引用.  
-{% highlight java %}
+
+```
   private Server server; // RPC server:NameNode的RPC服务器实例
   private Server serviceRpcServer;
   private InetSocketAddress serverAddress = null; /** RPC server address */
@@ -371,13 +392,15 @@ NameNode中有两个Server实例, 对于客户端的连接使用Server server, �
       serviceRpcServer.start();      
     }
   }
-{% endhighlight %}
+```
+
 
 NameNode作为IPC服务器接收客户端(server变量)/DataNode(serviceRpcServer)的连接请求
 
 
 **DataNode.getServer()**
-{% highlight java %}
+
+```
   public Server ipcServer; // For InterDataNodeProtocol 内部datanode调用的ipc服务器
 
   void startDataNode(Configuration conf, AbstractList<File> dataDirs, SecureResources resources) throws IOException {
@@ -386,13 +409,15 @@ NameNode作为IPC服务器接收客户端(server变量)/DataNode(serviceRpcServe
     ipcServer = RPC.getServer(this, ipcAddr.getHostName(), ipcAddr.getPort(), 3, false, conf, blockTokenSecretManager);
     dnRegistration.setIpcPort(ipcServer.getListenerAddress().getPort());
   }
-{% endhighlight %}
+```
+
 
 DataNode作为IPC服务器处理内部DataNode的请求.
 
 
 **JobTracker.getServer()**
-{% highlight java %}
+
+```
   Server interTrackerServer;
 
   JobTracker(final JobConf conf, String identifier, Clock clock, QueueManager qm) {
@@ -402,10 +427,12 @@ DataNode作为IPC服务器处理内部DataNode的请求.
   public void offerService() throws InterruptedException, IOException { /** Run forever */
     this.interTrackerServer.start(); // start the inter-tracker server
   }
-{% endhighlight %}
+```
+
 
 **TaskTracker.getServer()**
-{% highlight java %}
+
+```
   Server taskReportServer = null;
 
   synchronized void initialize() throws IOException, InterruptedException {
@@ -420,7 +447,8 @@ DataNode作为IPC服务器处理内部DataNode的请求.
     this.taskReportServer = RPC.getServer(this, socAddr.getHostName(), socAddr.getPort(), 2 * max, false, this.fConf, this.jobTokenSecretManager);
     this.taskReportServer.start();
   }
-{% endhighlight %}
+```
+
 
 
 上面四个组件NN, DN, JT, TT都在初始化方法中调用getServer获取IPC Server实例, 然后调用start()启动RPC Server.  
@@ -431,7 +459,8 @@ getServer() 调用new Server(instance,..) 将传入的对象引用this保存在R
 
 
 ###RPC.Server.call()
-{% highlight java %}
+
+```
     public Writable call(Class<?> protocol, Writable param, long receivedTime) throws IOException {
         Invocation call = (Invocation)param; //将参数转换为Invocation对象
         Method method = protocol.getMethod(call.getMethodName(), call.getParameterClasses()); //取得Invocation中的方法名和参数
@@ -439,12 +468,14 @@ getServer() 调用new Server(instance,..) 将传入的对象引用this保存在R
         Object value = method.invoke(instance, call.getParameters()); //反射调用: instance为接口的实现类.调用instance的method,参数为call.parameters
         return new ObjectWritable(method.getReturnType(), value); //将RPC调用的返回结果封装成ObjectWritable类型
     }
-{% endhighlight %}
+```
+
 
 ###RPC.call()
 来看RPC的最后一个没有分析到的call方法, 注意不是RPC.Server.call(). 该方法最主要的是client.call(), Invoker的invoke()里也调用了client.call()  
 该方法主要用于并行调用. 从Call Hierarchy可以看出只有TestRPC用到该方法. 该方法和Invoker.invoke()一样最终返回客户端的调用结果.  
-{% highlight java %}
+
+```
   /** Expert: Make multiple, parallel calls to a set of servers. */
   public static Object[] call(Method method, Object[][] params,InetSocketAddress[] addrs, UserGroupInformation ticket, Configuration conf) {
     Invocation[] invocations = new Invocation[params.length]; // 一组方法调用实例 
@@ -462,7 +493,8 @@ getServer() 调用new Server(instance,..) 将传入的对象引用this保存在R
       CLIENTS.stopClient(client); // 如果该client实例的引用计数为0, 该client就被关闭 
     }
   }
-{% endhighlight %}
+```
+
 
 ###Hadoop RPC & Java RPC
 ![HadoopRPC-1](https://n4tfqg.blu.livefilestore.com/y2pz0RDUIPDgLKEK6FcK3LwenqJQHh2FFkHTiwGmCqiAw7o3VuqjMfEtcF-SZdkNNpUwbubrSulAIRDvHpb57ym2RO3F_iwI2nRvwDnzzpgkmjcJp7j2lbJxs6Xns0jYppw/4-6%20HadoopRPC(1).png?psid=1)  

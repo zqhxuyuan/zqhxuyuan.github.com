@@ -14,7 +14,8 @@ Invoker中client的获取从ClientCache中得到, 如果不在Cache中则创建C
 ![5-1 Client method](https://n4tfqg.blu.livefilestore.com/y2pfWi8lrZhPcOghlU3xLN5HrClnzrlKjKd_DCSLkjP0L-rD_b4BiWW_eFN-n4OlJsWhU2l4hCnZvAhY7hjUUw-HuBQV4aTfdbxYFgdba4u7UCR3Uex0b4rOcRaUyqpECTF/5-1%20Client%20method.png?psid=1)  
 
 ###Client
-{% highlight java %}
+
+```
 /** A client for an IPC service.  
  * IPC calls take a single Writable as a parameter, and return a Writable as their value. ==> (ObjectWritable)client.call() 
  * A service runs on a port and is defined by a parameter class and a value class. */
@@ -43,7 +44,8 @@ public class Client {
     return socketFactory;
   }
 }
-{% endhighlight %}
+```
+
 
 Client最重要的属性是connections, 一个Clinet主要处理的是与服务端进行连接的工作, 包括连接的创建、监控等.  
 connections是一个Hashtable, 是线程安全的Map. Map的key是ConnectionID, 能确定唯一的连接, value是Connection, 代表此次连接的具体信息.  
@@ -60,7 +62,8 @@ Connection会通过socket连接服务器, 连接成功后会校验客户端/服�
 ####流程入口
 从RPC.Invoker.invoke: client.call(new Invocation(method, args), remoteId)为出发点, 开始分析Client的流程:  
 **RPC.Invoker**  
-{% highlight java %}
+
+```
   private static class Invoker implements InvocationHandler {
     private Client.ConnectionId remoteId;
     private Client client;
@@ -76,21 +79,25 @@ Connection会通过socket连接服务器, 连接成功后会校验客户端/服�
       return value.get();
     }
   }
-{% endhighlight %}
+```
+
 
 **Client.call**  
-{% highlight java %}
+
+```
   public Writable call(Writable param, ConnectionId remoteId) throws InterruptedException, IOException {
     Call call = new Call(param);
     Connection connection = getConnection(remoteId, call);
     connection.sendParam(call);                 // send the parameter
   }
-{% endhighlight %}
+```
+
 
 ![5-2 Client Connection](https://n4tfqg.blu.livefilestore.com/y2p2zEE5dw9oLSiSbWzg52kVsTbWdMV3-X_XQ3jTUXYTn0fT0H1DDIZU7iUT44yjHseFbhdhwN2b-dZRDA4vkS2qEUC0KTNMewhj1nNIRX-W_e0RFabdMxvdov_D9RkzpWa/5-2%20Client.Connection.png?psid=1)  
 
 ###Call
-{% highlight java %}
+
+```
   /** A call waiting for a value. */
   private class Call {
     int id;            	// call id 调用ID
@@ -122,7 +129,8 @@ Connection会通过socket连接服务器, 连接成功后会校验客户端/服�
       callComplete();
     }
   }
-{% endhighlight %}
+```
+
   
 Call内部类主要是对一次调用的实例进行监视与管理, 获取调用返回值value, 如果出错则获取出错信息error, 同时修改Client全局统计变量.  
 Client.Call类比RPC.Invocation对象多了几个属性(id, value), 同时也多了动作的处理(setValue时线程的通知).  
@@ -143,7 +151,8 @@ Client.Call类比RPC.Invocation对象多了几个属性(id, value), 同时也多
 在分析getConnection(ConnectionId, Call)之前先来分析ConnectionId和Connection两个内部类. Connection尤其重要.
 
 ###ConnectionId
-{% highlight java %}
+
+```
    /**This class holds the address and the user ticket.The client connections to servers are uniquely identified by<remoteAddress,protocol,ticket>*/
    static class ConnectionId {
      InetSocketAddress address;	// 远程服务器地址
@@ -171,12 +180,14 @@ Client.Call类比RPC.Invocation对象多了几个属性(id, value), 同时也多
        return false;
      }
   }
-{% endhighlight %}
+```
+
 
 一个连接的实体类, 标识了一个连接实例的Socket地址、用户信息UserGroupInformation、连接的协议类. 每个连接都是通过一个该类的实例唯一标识  
 只有当Socket地址:remoteAddress、用户信息ticket、连接的协议类protocol这三个属性的值相等时, 才被认为是同一个ConnectionId实例.  
 构造一个ConnectionId通过getConnectionId(在RPC.Invoker的构造函数中调动了该方法)  
-{% highlight java %}
+
+```
      static ConnectionId getConnectionId(InetSocketAddress addr,
          Class<?> protocol, UserGroupInformation ticket, int rpcTimeout,
          RetryPolicy connectionRetryPolicy, Configuration conf) throws IOException {
@@ -189,17 +200,20 @@ Client.Call类比RPC.Invocation对象多了几个属性(id, value), 同时也多
            conf.getInt("ipc.client.connection.maxidletime", 10000), connectionRetryPolicy,
            conf.getBoolean("ipc.client.tcpnodelay", false), Client.getPingInterval(conf));
      }
-{% endhighlight %}
+```
+
 
 ###ConnectionHeader
-{% highlight java %}
+
+```
 /** The IPC connection header sent by the client to the server on connection establishment. */
 class ConnectionHeader implements Writable {
   private String protocol;
   private UserGroupInformation ugi = null;
   private AuthMethod authMethod;
 }
-{% endhighlight %}
+```
+
 
 ConnectionId标识一个唯一的连接<address, protocol, ticket>,  ConnectionHeader为连接头信息, 在Client和Server建立连接的时候会发送连接头信息给Server:<protocol, ticket, authMethod>.  注意这里发送了protocol协议接口类型, 因为针对同一个Connection, 通过<addr, protocol, ticket>来唯一确定一个连接, 当Client对Server的某个protocol(Server可能实现了多个protocol)发起多次RPC调用, 只要针对的是同一个服务器地址, 同一个协议接口类型, 同一个用户, 那么使用的都是同一个Connection, 在发送RPC调用参数之前, 首先发送ConnectionHeader, 其中包括了此次Connection的协议接口类型, 这样每次的RPC调用就不需要再发送协议接口类型这个参数了, 这也正是Invocation对象并没有封装protocol的原因.  假设ConnectionHeader没有发送协议接口类型, 那么每一次RPC调用都要发送<protocol, method, args>这三个参数, 而针对同一个Connection的多次RPC调用, protocol值是相同的. 为了节省带宽在连接建立后connect(socket,server)就首先发送ConnectionHeader, 起到兵马未动, 粮草先行的作用. 此处的兵马=Call, 粮草=ConnectionHeader. 
 
@@ -208,7 +222,8 @@ ConnectionId标识一个唯一的连接<address, protocol, ticket>,  ConnectionH
 ####construction
 Connection: 连接管理内部线程类, 它读取(每一个Call调用实例执行后从服务端返回的)响应信息, 并通知调用者的线程(其他调用实例).  
 每一个连接拥有一个连接到远程服务端的Socket连接,该Socket能够实现多路复用,使得多个调用复用该Socket,客户端收到的调用得到的响应可能是无序的.  
-{% highlight java %}
+
+```
   /** Thread that reads responses and notifies callers. 
    * Each connection owns a socket connected to a remote address. 
    * Calls are multiplexed through this socket: responses may be delivered out of order. */
@@ -268,14 +283,16 @@ Connection: 连接管理内部线程类, 它读取(每一个Call调用实例执�
       this.setDaemon(true);	// 并设置一个连接为后台线程  
     }
   }
-{% endhighlight %}
+```
+
 
 客户端所拥有的Connection实例, 通过一个远程ConnectionId实例(remoteId, 唯一标识,上面的构造函数)来建立到客户端到服务端的连接  
 Client.call() 获取getConnection() 如果连接池中没有Connection, 则新建一个并加入连接池connections中.  
  
 ####calls operation
 定义的calls集合, 是用来保存当前活跃的调用实例, 以键值对的形式保存. 因此该类Connection提供了向该集合中添加新的调用实例、移除调用实例等操作  
-{% highlight java %}
+
+```
  	/** 向calls集合中添加一个<Call.id, Call> 
      * Add a call to this connection's call queue and notify a listener; synchronized. Returns false if called during shutdown.
      * @param call to add 此次要被添加的RPC调用
@@ -355,7 +372,8 @@ Client.call() 获取getConnection() 如果连接池中没有Connection, 则新�
         itor.remove();         
       }
     }
-{% endhighlight %}
+```
+
 
 ##RPC-->Client
 RPC中使用动态代理, 客户端调用接口的方法会调用Invoker.invoke():
@@ -370,7 +388,8 @@ client.call()将数据从客户端向服务端发送要解决的问题:  主要�
 
 ###1. Client.call(param, remoteId)
 **RPC方法调用**  
-{% highlight java %}
+
+```
   /** Make a call, passing param, to the IPC server defined by remoteId, returning the value. 
   * 执行一个调用, 通过传递参数值param到运行在addr上的IPC服务器, IPC服务器基于protocol与用户的ticket来认证, 并响应客户端
   * @param param 第一个参数Invocation实现了Writable, 作为Call的一部分 */
@@ -402,10 +421,12 @@ client.call()将数据从客户端向服务端发送要解决的问题:  主要�
       }
     }
   }
-{% endhighlight %}
+```
+
 
 还有一个并行RPC调用的重载方法  
-{% highlight java %}
+
+```
   /** Makes a set of calls in parallel. 执行并行调用  Each parameter is sent to the corresponding address. 每个参数都被发送到相关的IPC服务器 
    * When all values are available, or have timed out or errored, the collected results are returned in an array. 然后等待服务器响应信息
    * The array contains nulls for calls that timed out or errored.  */
@@ -431,11 +452,13 @@ client.call()将数据从客户端向服务端发送要解决的问题:  主要�
       return results.values; // 调用返回一组响应值 
     }
   }
-{% endhighlight %}
+```
+
 
 ###2. Client.getConnection(remoteId, call) 
 **得到连接**  
-{% highlight java %}
+
+```
   /** Get a connection from the pool, or create a new one and add it to the pool. Connections to a given ConnectionId are reused. */
   private Connection getConnection(ConnectionId remoteId, Call call) throws IOException, InterruptedException {
     if (!running.get()) {throw new IOException("The client is stopped");} // the client is stopped 连接关闭
@@ -466,13 +489,15 @@ client.call()将数据从客户端向服务端发送要解决的问题:  主要�
     connection.setupIOstreams(); // 和服务端建立连接
     return connection;
   }
-{% endhighlight %}
+```
+
 
 在获取到Connection对象之后, 客户端开始和服务端建立连接, 下面的方法都是Connection类中的方法. 通过connection.setupIOstreams()建立IO流, 准备数据传输.  方法中出现的比较重要的变量是针对此Connection连接用到的Socket, DataInputStream, DataOutputStream.  
   
 ###3. connection.setupConnection()
 **建立连接**  
-{% highlight java %}
+
+```
     private synchronized void setupConnection() throws IOException {
       short ioFailures = 0;
       short timeoutFailures = 0;
@@ -503,11 +528,13 @@ client.call()将数据从客户端向服务端发送要解决的问题:  主要�
       } catch (IOException e) { LOG.warn("Not able to close a socket", e);}
       socket = null; // set socket to null so that the next call to setupIOstreams can start the process of connect all over again.
     }
-{% endhighlight %}
+```
+
 
 ###4. connection.setupIOstreams() 
 **设置IO流, 启动连接线程**  
-{% highlight java %}
+
+```
     /** Connect to the server and set up the I/O streams. 
 　　 * It then sends a header to the server and starts the connection thread that waits for responses. 发送header给服务端,启动Connection线程等待返回
      * 客户端和服务器建立连接, 然后客户端会一直监听服务端传回的数据. 和05例子的监听器类似 */
@@ -552,7 +579,8 @@ client.call()将数据从客户端向服务端发送要解决的问题:  主要�
       out.write(buf.getData(), 0, bufLen);
     }
   }
-{% endhighlight %}
+```
+
 
 在setupIostreams方法中, 首先调用了setupConnection开始建立Client和Server的通讯连接, 并从建立的Socket连接中获取到输入流和输出流, 这个时候Client和Server的通讯就可以开始了. 虽然此时还没有调用sendParam进行RPC调用. 但是在建立好连接后已经可以预先从Client发送RPC的Header(writeRpcHeader)和协议的Header(writeHeader)[这两个过程和RPC的Call没有关系, 但却是必须要先完成的操作, 好比getProxy返回proxy对象之前要进行版本的比对], Server端也可以开始接收数据了.  
 
@@ -562,15 +590,18 @@ writeRpcHeader发送的数据Server会进行版本验证和鉴权. writeHeader�
 
 ####touch()
 使用到了java.util.concurrent.atomic包中的一些工具, 像AtomicLong、AtomicBoolean, 这些类能够以原子方式更新其值, 支持在单个变量上解除锁二实现线程的安全. 这些类能够使用get方法读取volatile变量的内存效果, set方法可以设置对应变量的内存值 
-{% highlight java %}
+
+```
     private void touch() {
       lastActivity.set(System.currentTimeMillis()); /** Update lastActivity with the current time. */
     }
-{% endhighlight %}
+```
+
 
 ###5. connection.sendParam(call)
 **发送数据**  
-{% highlight java %}
+
+```
     /** Initiates a call by sending the parameter to the remote server. 发送Call对象给远程服务器,开始RPC调用
      * Note: this is not called from the Connection thread, but by other threads. 不是由当前客户端连接的线程调用 */
     public void sendParam(Call call) {
@@ -594,14 +625,16 @@ writeRpcHeader发送的数据Server会进行版本验证和鉴权. writeHeader�
         IOUtils.closeStream(d);
       }
     }  
-{% endhighlight %}
+```
+
 
 在Client和Server建立IO流的时候, Client向Server发送的是RPCHeader和协议相关的ConnectionHeader. 发送RPC调用发送的是具体的RPC调用信息了.  
 在setupIOstreams中启动了Connection线程, 用于接收服务器传回的返回数据.  
 
 
 ###6. connection.run()
-{% highlight java %}
+
+```
   private class Connection extends Thread {
     // 建立连接后, start()会调用run(), 相当于05中的监听器. 监听服务端返回的数据并读取数据.
     public void run() {
@@ -631,7 +664,8 @@ writeRpcHeader发送的数据Server会进行版本验证和鉴权. writeHeader�
       }
     }
   }
-{% endhighlight %}
+```
+
 
 接收返回数据, 从setupIOstreams中构造好的输入流中读取数据, 输入流的数据来自于Server回传给Client的. 因为最好将Client和Server之间发送和接收数据的代码放在一起分析, 会更加准确地理解他们之间交互的过程. 这个过程对sendParam方法也是适用的.  
 

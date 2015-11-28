@@ -8,7 +8,8 @@ description:
 ---
 
 ###Connection
-{% highlight java %}
+
+```
   /** Reads calls from a connection and queues them for handling. */
   public class Connection {
     // TCP相关变量
@@ -53,7 +54,8 @@ description:
       }
     }
   } 
-{% endhighlight %}
+```
+
   
 Connection中比较重要的成员变量是SocketChannel, 构造函数的参数SocketChannel是由上面分析到的Listener.doAccept中传入的.  
 客户端写入的数据服务端通过通道SocketChannel先写到缓冲区中(上面三个数据分别对应三种缓冲区). 接着就可以从缓冲区取出数据.   
@@ -67,7 +69,8 @@ Connection中比较重要的成员变量是SocketChannel, 构造函数的参数S
 
 在分析readAndProcess方法之前, 先来看下Client发送的三种数据的格式.  
 writeRpcHeader用到的数据格式,注意数据的类型,后面要根据数据类型来计算缓冲区的长度. byte=1个字节, int=4个字节, ByteBuffer有多少字符就多少字节.  
-{% highlight java %}
+
+```
   // The first four bytes of Hadoop RPC connections
   public static final ByteBuffer HEADER = ByteBuffer.wrap("hrpc".getBytes());
   
@@ -82,7 +85,8 @@ writeRpcHeader用到的数据格式,注意数据的类型,后面要根据数据�
     KERBEROS((byte) 81, "GSSAPI", AuthenticationMethod.KERBEROS),
     DIGEST((byte) 82, "DIGEST-MD5", AuthenticationMethod.TOKEN);
   }
-{% endhighlight %}
+```
+
 
 1. writeHeader和sendParam方法因为发送的都是对象数据, 分别是ConnectionHeader和Call. 而对象的长度是事先预估的. 所以采用显示长度的数据帧结构.  
 2. ConnectionHeader(protocol, ticket, authMethod), 与ConnectionId(address, ticket, prototol)不同, 没有address. 因为ConnectionId是用来唯一确定一个连接的, 所以是需要Server的地址来确定一个连接. 而ConnectionHeader是作为一个连接头要发送给Server, 显然不需要发送address信息, 发送了也没用处.  
@@ -104,7 +108,8 @@ ConnectionHeader.length和Call.length都是int类型, int占用4个字节, 所�
 从Server.Connection属性也可看出读取Client数据时只用了3个Buffer: rpcHeaderBuffer(2个字节), dataLengthBuffer(4个字节), data(显示长度dataLenth).  
 
 ####流程分析 
-{% highlight java %}
+
+```
     /* Write out the RPC header: header, version and authentication method */
     private void writeRpcHeader(OutputStream outStream) throws IOException {
       DataOutputStream out = new DataOutputStream(new BufferedOutputStream(outStream));
@@ -135,7 +140,8 @@ ConnectionHeader.length和Call.length都是int类型, int占用4个字节, 所�
       out.write(data, 0, dataLength);		// ⑦ write the data 显示长度, 长度为dataLenth
       out.flush();
     }  
-{% endhighlight %}
+```
+
 
 ![Connection flow1](https://n4tfqg.blu.livefilestore.com/y2pEqGMA7x4tY5rDQTrwndWmD8TYTqQj6WlbX64fKomQTK6XQRR5IPR3PNgJv-DTB5rPJk28rFZNqv6RS8hi2v6WRvQzkFnf1M2a9T4mhLVYZC0hDLWMogk41SF1j_Ea0qX/6-7%20Conn%20flow-1.png?psid=1)  
 ![Connection flow2](https://n4tfqg.blu.livefilestore.com/y2pDq30STSsxOaSrfecsB5Rc9T4_ra6WMRfN38jXYzpoBsoFmUdZqiLDd_gVbWOPujrhsZivLKQvu_u2O0BC_gVbBMmI9DOvEv_yFiz1DiZ636n5owhw5coknrSE9ps-_-b/6-7%20Conn%20flow-2.png?psid=1)  
@@ -143,7 +149,8 @@ ConnectionHeader.length和Call.length都是int类型, int占用4个字节, 所�
 
 
 ####readAndProcess
-{% highlight java %}
+
+```
   private BlockingQueue<Call> callQueue; // queued calls
 
   public class Connection {
@@ -253,7 +260,8 @@ ConnectionHeader.length和Call.length都是int类型, int占用4个字节, 所�
       incRpcCount();  		// Increment the rpc count 增加RPC调用统计计数 
     }
 }
-{% endhighlight %}
+```
+
 
 processData()的参数byte[] buf为客户端发送的Call.id+Call.param(上面已经分析了将数据从SocketChannel读取到data缓冲区中,当缓冲区被读满后反转缓冲区就可以读取data缓冲区里的内容了). 根据buf构建了一个输入流, 从输入流中读取到客户端sendParam传送的call.id和call.param.  
 由于param是可序列化的, paramClass在Server中我们分析过了(RPC.getServer()-->new Server时传入的),是RPC的Invocation.class.  
@@ -266,7 +274,8 @@ callQueue队列的初始化在创建Server时被初始化为LinkedBlockingQueue<
 
 
 ###Handler
-{% highlight java %}
+
+```
   /** This is set to Call object before Handler invokes an RPC and reset after the call returns.
   * 和SERVER一样CurCall也是个ThreadLocal对象,确保了线程安全.*/
   private static final ThreadLocal<Call> CurCall = new ThreadLocal<Call>();
@@ -298,7 +307,8 @@ callQueue队列的初始化在创建Server时被初始化为LinkedBlockingQueue<
       }    
     }
   }
-{% endhighlight %}
+```
+
 
 ####Call.param历险记
 Handler的run方法里调用了Server的抽象方法call(), 会调用到实现类RPC.Server.call(). 参数中的call变量从callQueue中取出队列的第一个元素进行处理
@@ -309,17 +319,20 @@ Handler的run方法里调用了Server的抽象方法call(), 会调用到实现�
 RPC.getServer() --> new RPC.Server()传入的Invocation.class在ipc.Server中对应了paramClass, 通过paramClass新建了Server.Call.   Handler取出的Server.Call又调用回RPC.Server.call(). 因为最开始传入的是Invocation.class, 所以在RPC.Server.call中可以将param转为Invocation.  
 
 **RPC.Server**  
-{% highlight java %}
+
+```
     public Server(Object instance, Configuration conf, String bindAddress,  int port, 
               int numHandlers, boolean verbose, SecretManager secretManager) {
       super(bindAddress, port, Invocation.class, numHandlers, conf, classNameBase(instance.getClass().getName()), secretManager);
       this.instance = instance;
       this.verbose = verbose;
     }
-{% endhighlight %}
+```
+
 
 **Server**  
-{% highlight java %}
+
+```
     private Class<? extends Writable> paramClass;   // class of call parameters
     protected Server(String bindAddress, int port, Class<? extends Writable> paramClass, int handlerCount, ...) {
       this.bindAddress = bindAddress;
@@ -327,27 +340,33 @@ RPC.getServer() --> new RPC.Server()传入的Invocation.class在ipc.Server中对
       this.port = port;
       this.paramClass = paramClass;
     }
-{% endhighlight %}
+```
+
 
 **Server.Connection**  
-{% highlight java %}
+
+```
     private void processData(byte[] buf) {
       Writable param = ReflectionUtils.newInstance(paramClass, conf);//read param      
       Call call = new Call(id, param, this); //封装成Call对象. 第三个参数为Connection就当前连接
       callQueue.put(call);
     }
-{% endhighlight %}
+```
+
 
 **Handler**  
-{% highlight java %}
+
+```
     public void run() {
  		  Call call = callQueue.take()
  		  call(call.connection.protocol, call.param, call.timestamp)
     }
-{% endhighlight %}
+```
+
 
 **RPC.Server.call()**  
-{% highlight java %}
+
+```
     public Writable call(Class<?> protocol, Writable param, long receivedTime) throws IOException {
         Invocation call = (Invocation)param; //将参数转换为Invocation对象
         Method method = protocol.getMethod(call.getMethodName(), call.getParameterClasses()); //取得Invocation中的方法名和参数
@@ -355,14 +374,16 @@ RPC.getServer() --> new RPC.Server()传入的Invocation.class在ipc.Server中对
         Object value = method.invoke(instance, call.getParameters()); //反射调用: instance为接口的实现类.调用instance的method,参数为call.parameters
         return new ObjectWritable(method.getReturnType(), value); //将RPC调用的返回结果封装成ObjectWritable类型
     }
-{% endhighlight %}
+```
+
 
 Handler线程主要的任务是：真正地实现了处理来自客户端的调用(反射调用到协议实现类的方法), 并设置每个相关调用的响应setupResponse().  
 Handler将Call调用的id, 状态, 返回值最终设置到call调用的response缓冲区. 具体的响应(服务器向客户端写入数据)交给Responder处理.  
 因为Call对象始终贯穿在整个流程中, 所以Responder获取到Call对象,能够从Call中获取到数据,并负责向客户端写入数据.  
 
 Handler的run方法在调用call之后的处理:  
-{% highlight java %}
+
+```
           synchronized (call.connection.responseQueue) {
             // setupResponse() needs to be sync'ed together with responder.doResponse() since setupResponse may use
             // SASL to encrypt response data and SASL enforces its own message ordering.
@@ -375,10 +396,12 @@ Handler的run方法在调用call之后的处理:
  			//将调用call(已经将response设置到call中,后面就能从call中读取出数据)加入到响应队列中, 等待客户端读取响应信息  
             responder.doRespond(call);
           }
-{% endhighlight %}
+```
+
 
 ####Server.setupResponse()
-{% highlight java %}
+
+```
   /** Setup response for the IPC Call. 设置RPC调用的响应信息   与客户端读取数据互相对应,这里写什么,客户端就读取什么.
    * @param response buffer to serialize the response into 缓冲区用来序列化响应信息, 响应要发送给客户端
    * @param call to which we are setting up the response 调用对象
@@ -400,10 +423,12 @@ Handler的run方法在调用call之后的处理:
     }
     call.setResponse(ByteBuffer.wrap(response.toByteArray())); //将response设置到Call的response缓冲区中
   }
-{% endhighlight %}
+```
+
 
 Server.setupResponse()发送的数据(实际上此时还没发送)对应的接收方是Client.Connection的receiveResponse()  
-{% highlight java %}
+
+```
     private void receiveResponse() {
         touch();
         int id = in.readInt();                    // try to read an id
@@ -422,7 +447,8 @@ Server.setupResponse()发送的数据(实际上此时还没发送)对应的接�
           markClosed(new RemoteException(WritableUtils.readString(in), WritableUtils.readString(in)));
         }
     }
-{% endhighlight %}
+```
+
 
 但是请注意, setResponse并没有发送数据给客户端, 该方法仅起到了一个中介的作用, 将要写入客户端的数据通过DataOutputStream设置到call.response中, Server.Call的resopnse属性是ByteBuffer类型. 注意和前面Client.Connection.sendParam的方式不同,sendParam是写到缓冲区DataOutputBuffer, 再读取缓冲区的内容输出到DataOutputStream就可以向Server发送数据了. 其实看IO流是否发送/接收数据, 关键看输出流/输入流是否真正工作, 上面的setupResponse的DataOutputStream是一个方法内的变量, 不是作用在Server端的, 仅提供给ByteArrayOutputStream response使用, 所以是不会发送数据的. 而Client.Connection.sendParam的out变量是通过Socket获取到的DataOutputStream. 当向该对象写入数据是可以发送数据的.  
 
@@ -445,7 +471,8 @@ Handler通过调用Responder.doRespond()将处理完的结果(call.response)交�
 
 
 在将应答(Call)放入队列后, 做了一个特殊的处理, 如果IPC连接的responseQueue只有一个元素, 立即调用processResponse()向Client发送处理结果,其中第二个参数inHandler = true, 表示processResponse的处理线程仍然是Handler, 而不是交由Response线程处理. 这是一个提高服务器性能的优化, 当应答队列responseQueue只有一个元素的时候, 表明对应的IPC连接比较空闲, 这时候直接调用processResponse()发送应答, 可以避免从Handler的处理线程到Responder处理线程的切换开销.  
-{% highlight java %}
+
+```
     // Enqueue a response from the application. 从队列中弹出response
     //当完成一个Call调用后, Handler会将调用的Call加入到响应队列的末尾, Call包含了服务端对客户端的响应
     void doRespond(Call call) throws IOException {
@@ -456,14 +483,16 @@ Handler通过调用Responder.doRespond()将处理完的结果(call.response)交�
         }
       }
     } 
-{% endhighlight %}
+```
+
 
 前面的Listener线程的run()监听了OP_ACCEPT, Listener的内部类Reader线程的run()监听了OP_READ, 这里介绍的Responder线程的run()监听的是OP_WRITE事件. 因为Responder负责向Client写入处理结果数据.  
 Listener监听的OP_ACCEPT的注册发生在new Listener的时候, Reader监听的OP_READ的注册发生在接受OP_ACCEPT事件后的doAccept()里.  
 那么Responder监听的OP_WRITE的注册来自于哪里? ->processResponse inandler=true.  
 处理响应的目标是将Call中的response(ByteBuffer) 写到通道中. 这样客户端就能从Socket连接中根据输入流取得数据.  
 (Client采用阻塞IO只使用了Socket对象发送和接收对象, Server端采用NIO, 使用的对象有ServerSocketChannel, SocketChannel)  
-{% highlight java %}
+
+```
     // Processes one response. Returns true if there are no more pending data for this channel. 处理一个通道上调用的响应数据,如果该通道空闲返回true  
     private boolean processResponse(LinkedList<Call> responseQueue, boolean inHandler) throws IOException {
       boolean error = true;
@@ -525,7 +554,8 @@ Listener监听的OP_ACCEPT的注册发生在new Listener的时候, Reader监听�
       }
       return done;
     }
-{% endhighlight %}
+```
+
 
 processResponse的处理是:  
 
@@ -540,7 +570,8 @@ processResponse的处理是:
 
 往Responder的通道注册writeSelector的OP_WRITE事件, 类似于在Listener的doAccept中注册readSelector的OP_READ事件
 **Listener:**  
-{% highlight java %}
+
+```
     void doAccept(SelectionKey key) {
         try {
           reader.startAdd();											//激活Reader.readSelector, 设置adding为true 
@@ -551,10 +582,12 @@ processResponse的处理是:
           reader.finishAdd();  //设置adding为false,采用notify()唤醒一个reader, 初始化Listener时启动的每个reader都使用了wait()方法等待
         }
     }
-{% endhighlight %}
+```
+
 
 **Reader:**  
-{% highlight java %}
+
+```
       private volatile boolean adding = false;
     
       public synchronized SelectionKey registerChannel(SocketChannel channel) throws IOException {
@@ -585,10 +618,12 @@ processResponse的处理是:
               }
           }
       }
-{% endhighlight %}
+```
+
 
 **Responder**  
-{% highlight java %}
+
+```
     private int pending = 0;
     
     private boolean processResponse(LinkedList<Call> responseQueue, boolean inHandler) throws IOException {
@@ -627,12 +662,14 @@ processResponse的处理是:
       while (pending > 0) 
         wait();
     }
-{% endhighlight %}
+```
+
 
 ![6-10 Reader Responder](https://n4tfqg.blu.livefilestore.com/y2pfWi-HTlb3uVV9HZRSCgyrXJKZ12ou0HoOFXT8kikTC22LCOv5mZFhabunnMGwAQkA6dx_7GnEKgC_kGP-0e2_5O2xNAod7dXMjPxhAIZQYHd24hE2bhAOAqIlQXZojbE/6-10%20Reader%20Responder.png?psid=1)  
 
 ####Responder.run()
-{% highlight java %}
+
+```
   // Sends responses of RPC back to clients.
   private class Responder extends Thread {
     private Selector writeSelector;
@@ -673,7 +710,8 @@ processResponse的处理是:
         }
       }
     }
-{% endhighlight %}
+```
+
 
 通过线程执行可以看到, 调用的响应数据(Responder)的处理, 是在服务器运行过程中处理的, 而且分为两种情况:  
 
@@ -681,7 +719,8 @@ processResponse的处理是:
 	2、如果某些调用超过了指定的时限而一直未被处理, 这些调用被视为过期, 服务器不会再为这些调用处理, 而是直接清除掉(run下半部分)
 
 run的while循环的下半分是清除过期的调用:  
-{% highlight java %}
+
+```
     public void run() {
       long lastPurgeTime = 0;   				// last check for old calls. 最后一次清除过期调用的时间  
       while (running) {
@@ -728,7 +767,8 @@ run的while循环的下半分是清除过期的调用:
       }
     }
   }
-{% endhighlight %}
+```
+
 
 
 

@@ -9,8 +9,9 @@ description:
 
 ###Java序列化
 **序列化Serialization**:将结构化的对象转化为字节流,以便在网络上传输或写入硬盘进行永久存储;   
-**反序列化deserialization**:将字节流转回到结构化对象的过程.
-{% highlight java %}
+**反序列化deserialization**:将字节流转回到结构化对象的过程.  
+
+```java
 public class JavaSerialize { // 2-1
 	public static void main(String[] args) throws Exception {
 		Block block = new Block(111L, 222L, 333L);
@@ -46,7 +47,8 @@ class Block implements Serializable{
 		this.numBytes = numBytes;
 	}
 }
-{% endhighlight %}
+```
+
 Java的IO采用了**装饰模式**, 上面的测试示例中ObjectInputStream封装了ByteArrayInputStream, 扩展了字节数组的功能.
 
 
@@ -63,7 +65,7 @@ Hadoop HDFS的通信以及MapReduce的Mapper,Combiner,Reducer等阶段之间的�
 
 ![Hadoop 序列化](https://bbd7kw.blu.livefilestore.com/y2pv18wN8Vvt4o-Isvx_B3fIRqAhQhAChOOlE7WhJTS8NrJh5eOGfhniaJDt19fQig0B67AECKRxtU-2ubddYnt3gJ41yednRm0scry-2a_aaftD4hZ_NL7gTasP5eNDRJJ/1-Writable.png?psid=1)
 
-{% highlight java %}
+```java
 /** A serializable object which implements a simple, efficient, serialization protocol, based on DataInput and DataOutput.
  * Any key or value type in the Hadoop Map-Reduce framework implements this interface. 
  * Implementations typically implement a static read(DataInput) method which constructs a new instance,  
@@ -78,10 +80,11 @@ public interface Writable {
    * @param in DataInput to deseriablize this object from. */
   void readFields(DataInput in) throws IOException;
 }
-{% endhighlight %}
+```
 
 实现了Writable接口的一个典型例子如下:
-{% highlight java %}
+
+```java
 public class MyWritable implements Writable {
 	private int counter; // Some data
 	private long timestamp;
@@ -100,11 +103,12 @@ public class MyWritable implements Writable {
 		return w;
 	}
 }
-{% endhighlight %} 
+```
 
 
 下面的代码来自于Hadoop权威指南的测试示例(经过简单加工) 测试用例2-2
-{% highlight java %}
+
+```java
 public class WritableTest extends TestCase{
 	@Test // 2-2
 	public void testIntWritable() throws IOException{
@@ -137,22 +141,25 @@ public class WritableTest extends TestCase{
 		return bytes;
 	}
 }
-{% endhighlight %}
+```
+
 上面的测试示例中DataInputStream实现了DataInput接口, 并封装了ByteArrayInputStream扩展了字节数组的功能.  
 
 ###WritableComparable
 对MapReduce来说, 类型的比较是非常重要的, 因为中间有个基于键的排序阶段
-{% highlight java %}
+
+```java
 /** A Writable which is also Comparable. 
  * WritableComparables can be compared to each other, typically via Comparators. 
  * Any type which is to be used as a key in the Hadoop Map-Reduce framework should implement this interface. */
 public interface WritableComparable<T> extends Writable, Comparable<T> {
 }
-{% endhighlight %}
+```
 
 ####IntWritable
 实现WritableComparable的类有IntWritable, BooleanWritable等
-{% highlight java %}
+
+```java
 /** A WritableComparable for ints. */
 public class IntWritable implements WritableComparable {
   private int value;
@@ -169,7 +176,7 @@ public class IntWritable implements WritableComparable {
     return (thisValue<thatValue ? -1 : (thisValue==thatValue ? 0 : 1));
   }
 }
-{% endhighlight %}
+```
 
 ###WritableComparator
 IntWritable实现了WritableComparable类, 并通过compareTo来进行对象的比较. Hadoop还提供了一个更高效的比较接口RawComparator.  
@@ -177,14 +184,17 @@ IntWritable实现了WritableComparable类, 并通过compareTo来进行对象的�
 一般而言我们会让对象实现Comparable接口, 进行该对象和传入的对象的比较, 而新建一个Comparator比较器来比较两个不同的对象  
 
 static块在类加载的时候运行进行注册: 
-{% highlight java %}
+
+```java
   static {   // register this comparator 注册比较器, IntWritable定义了自己的内部类比较器
     WritableComparator.define(IntWritable.class, new Comparator());
   }
-{% endhighlight %}
+```
+
 WritableComparator静态方法define用于注册实现WritableComparable(比如IntWritable)的内部类比较器.  
 实际是放入一个Map中, key为实现WritableComparable(IntWritable)的Class类型, value为该比较器.  
-{% highlight java %}
+
+```java
 /** A Comparator for WritableComparables.
  * This base implemenation uses the natural ordering.  To define alternate orderings, override #compare(WritableComparable,WritableComparable).
  * 
@@ -205,20 +215,22 @@ public class WritableComparator implements RawComparator {
     comparators.put(c, comparator);
   }
 }
-{% endhighlight %}
+```
 
 RawComparator继承Java Comparator,允许其实现直接比较字节流中的记录, 无需先把字节流反序列化为对象再进行比较,避免了新建对象的额外开销.
-{% highlight java %}
+
+```java
 /** A Comparator that operates directly on byte representations of objects. */
 public interface RawComparator<T> extends Comparator<T> {
   public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2);
 }
-{% endhighlight %}
+```
 
 以IntWritable的内部类Comparator为例, 方法compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2)就是对RawComparator的compare方法的实现.  
 该方法可以从每个字节数组byte[] b1和b2中读取给定起始位置(s1,s2)以及长度(l1,l2)的一个整数, 通过readInt()直接在字节数组中读入需要比较的两个整数, 该过程并没有使用IntWritable对象, 从而避免了不必要的对象分配. 后面有针对此的一个测试用例2-3.  
 所以说IntWritable.Comparator是一个优化的比较方法. 实际上WritableComparator也默认实现了compare方法, 但IntWritable.Comparator进行了重写.  
-{% highlight java %}
+
+```java
   // IntWritable的内部类Comparator比较器 >> WritableComparator --|> RawComparator接口 >> Comparator
   /** A Comparator optimized for IntWritable. */ 
   public static class Comparator extends WritableComparator {
@@ -232,10 +244,11 @@ public interface RawComparator<T> extends Comparator<T> {
       return (thisValue<thatValue ? -1 : (thisValue==thatValue ? 0 : 1));
     }
   }
-{% endhighlight %}
+```
 
 现在来看IntWritable.Comparator的构造函数通过super调用到父类WritableComparator的构造器
-{% highlight java %}
+
+```java
 public class WritableComparator implements RawComparator {
   private final Class<? extends WritableComparable> keyClass;
   private final WritableComparable key1;
@@ -272,7 +285,7 @@ public class WritableComparator implements RawComparator {
     return compare((WritableComparable)a, (WritableComparable)b);
   }
 }
-{% endhighlight %}
+```
 
 WritableComparator定义了多个同名的compare比较方法:   
 实现RawComparator的比较方法compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2)  
@@ -283,23 +296,20 @@ WritableComparator定义了多个同名的compare比较方法:
 同样以WritableComparable的实现类IntWritable为例, IntWritable实现了Comparable的compareTo(Object o)方法.  
 所以WritableComparator的compare(WritableComparable a, WritableComparable b)调用的a.compareTo(b)最终调用了IntWritable.compareTo(Object o)方法.  
 
-
-
 ###Comparable+Comparator测试用例
 
 我们来用Eclipse的Debug工具来证明compare(WritableComparable a, WritableComparable b)最终调用到IntWritable.compareTo(Object o)方法  
-{% highlight java %}
-	@Test // 2-3
-	public void testIntWritableComparable() throws IOException{
+
+```java
+@Test // 2-3
+public void testIntWritableComparable() throws IOException{
     IntWritable w1 = neIntWritablew (162);
 		IntWritable w2 = new IntWritable(163);
 		
 		RawComparator<IntWritable> comparator = WritableComparator.get(IntWritable.class);  // ①
 		System.out.println(comparator.compare(w1, w2) < 0);	// ②  ⑨
-	}
-{% endhighlight %}
+}
 
-{% highlight java %}
 public class WritableComparator implements RawComparator {
   public int compare(WritableComparable a, WritableComparable b) { // ③
     return a.compareTo(b); // ④  ⑦
@@ -309,9 +319,7 @@ public class WritableComparator implements RawComparator {
     return compare((WritableComparable)a, (WritableComparable)b); // ③  ⑧
   }
 }
-{% endhighlight %}
 
-{% highlight java %}
 public class IntWritable implements WritableComparable {
   public int compareTo(Object o) { // ⑤
     int thisValue = this.value;
@@ -319,7 +327,7 @@ public class IntWritable implements WritableComparable {
     return (thisValue<thatValue ? -1 : (thisValue==thatValue ? 0 : 1)); // ⑥
   }
 }
-{% endhighlight %}
+```
 
 ① 为了获得WritableComparator对象, 我们使用WritableComparator.get()方法根据类型来获取一个比较器:  
 前面说过通过static块进行类型和比较器<IntWritable.class, IntWritable.Comparator>的注册, 有put就有get.  
@@ -340,7 +348,8 @@ IntWritable.Comparator还实现了RawComparator的字节流比较方法, 后面�
 ⑤ 进行对象的比较.  
 
 上面说过IntWritable.Comparator实现了RawComparator的优化的字节流比较方法, 对应的测试用例:
-{% highlight java %}
+
+```java
 	@Test // 2-4
 	public void testIntWritableComparator() throws IOException{		
 		IntWritable w1 = new IntWritable(162);
@@ -350,9 +359,7 @@ IntWritable.Comparator还实现了RawComparator的字节流比较方法, 后面�
 		RawComparator<IntWritable> comparator = WritableComparator.get(IntWritable.class);
 		System.out.println(comparator.compare(b1, 0, b1.length, b2, 0, b2.length) < 0); // ①
 	}
-{% endhighlight %}
 
-{% highlight java %}
 public class IntWritable implements WritableComparable {
   public static class Comparator extends WritableComparator {
     public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) { // ②
@@ -362,9 +369,7 @@ public class IntWritable implements WritableComparable {
     }
   }
 }
-{% endhighlight %}
 
-{% highlight java %}
 public class WritableComparator implements RawComparator {
   public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) { // RawComparator的比较方法
     buffer.reset(b1, s1, l1);   	// parse key1
@@ -374,7 +379,7 @@ public class WritableComparator implements RawComparator {
     return compare(key1, key2); 	// compare them
   }
 }
-{% endhighlight %}
+```
 
 ① 上面说过WritableComparator.get(IntWritable.class)返回的实际是IntWritable.Comparator. 
 调用字节流比较方法compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) 

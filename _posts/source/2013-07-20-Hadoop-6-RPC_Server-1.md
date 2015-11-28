@@ -27,7 +27,8 @@ position在调用put()时指出了下一个数据元素应该被插入的位置,
 **init-put-flip-get-clear**  
 我们已经写满了缓冲区(3右), 现在我们必须准备将其清空. 我们想把这个缓冲区传递给一个通道, 以使内容能被全部写出,或者缓冲区还没被写满(3左)就开始读取. 但如果通道现在在缓冲区上执行get(), 那么它将从我们刚刚插入的有用数据之外取出未定义数据. 如果我们将位置值重新设为0, 通道就会从正确位置开始获取, 但是它是怎样知道何时到达我们所插入数据末端的呢？这就是上界属性limit被引入的目的. 上界属性指明了缓冲区有效内容的末端. 我们需要将上界属性设置为当前位置, 然后将位置position重置为0.  
 Buffer的flip()方法将一个能够继续添加数据元素的填充状态(fill)的缓冲区翻转成一个准备读出元素的释放状态(drained)  
-{% highlight java %}
+
+```
 	public static void testBufferPutAndGet() throws Exception{
 		// 1. init
 		ByteBuffer byteBuffer = ByteBuffer.allocate (100);
@@ -52,10 +53,12 @@ Buffer的flip()方法将一个能够继续添加数据元素的填充状态(fill
 		byteBuffer.clear();
 		printMsg(byteBuffer); //[pos=0 lim=100 cap=100]
 	}
-{% endhighlight %}
+```
+
 
 打印信息  
-{% highlight java %}
+
+```
 java.nio.HeapByteBuffer[pos=0 lim=100 cap=100]		1. init
 java.nio.HeapByteBuffer[pos=10 lim=100 cap=100]		2. put
 java.nio.HeapByteBuffer[pos=0 lim=10 cap=100]		3. flip
@@ -70,11 +73,13 @@ java.nio.HeapByteBuffer[pos=8 lim=10 cap=100] r
 java.nio.HeapByteBuffer[pos=9 lim=10 cap=100] l
 java.nio.HeapByteBuffer[pos=10 lim=10 cap=100] d
 java.nio.HeapByteBuffer[pos=0 lim=100 cap=100]		5. clear
-{% endhighlight %}
+```
+
 
 ####Channel
 ![6-3 Channel](https://n4tfqg.blu.livefilestore.com/y2pz3lj2-gjdYRl_kz4bqLJXxkwCLJl2oylPO9IeSKUB7irYKdRnjcM_IaoywKSqLOlOxlIPBtCWIvF4Tb2x3uPr2EaJNsX5176sjLGnxdOL5GmcJX0OZOxycV-cRsuLw_h/6-3%20NIO%20Channel%20read%20write.png?psid=1)  
-{% highlight java %}
+
+```
 	public static void testBufferToWriteChannel() throws Exception{
 		// 1. init
 		ByteBuffer byteBuffer = ByteBuffer.allocate (100);
@@ -121,7 +126,8 @@ java.nio.HeapByteBuffer[pos=0 lim=100 cap=100]		5. clear
 		byteBuffer.clear();
 		printMsg(byteBuffer);
 	}
-{% endhighlight %}
+```
+
 
 ####Socket(TD)
 
@@ -230,7 +236,8 @@ callQueue调用队列为全局属性, 在Connection中添加(有客户端写入�
 ###Server
 ipc.Server是服务端的抽象实现, 定义了一个抽象的IPC服务. IPC Server接收Client发送的参数值,并返回响应值.  
 同时作为IPC模型的服务端, 它要维护Client端到Server端的一组连接.  
-{% highlight java %}
+
+```
 /** An abstract IPC service.  IPC calls take a single Writable as a parameter, and return a Writable as their value.
  * A service runs on a port and is defined by a parameter class and a value class. */
 public abstract class Server {
@@ -322,7 +329,8 @@ public abstract class Server {
     }
   }
 }
-{% endhighlight %}
+```
+
 
 Server的构造方法对一个Server实例进行初始化, 包括一些静态信息如绑定地址bindAddress+port、维护连接数量handlerCount、队列callQueue等, 还有一些用来处理Server端事务的线程:Listener(Listener中的Reader[]), Handler[], Responder等  
 
@@ -332,7 +340,8 @@ RPC.getServer会new一个RPC.Server, 在RPC.Server中会调用父类的构造器
 
 ###Call
 Server.Call内部类表示Server端使用队列维护的调用实体类  
-{% highlight java %}
+
+```
   /** A call queued for handling. */
   private static class Call {
     private int id;                	// the client's call id 客户端的RPC调用对象Call的id =  Client.Call.id
@@ -352,7 +361,8 @@ Server.Call内部类表示Server端使用队列维护的调用实体类
       this.response = response;
     }
   }
-{% endhighlight %}
+```
+
 
 ###Listener
 Client端的底层通信采用了阻塞式IO编程, Server端采用Listener线程类监听客户端的连接, 并为Handler处理器线程创建处理任务  
@@ -361,7 +371,8 @@ Server.Listener主要负责两个阶段的任务
   当服务器运行时, 不断地通过选择器来选择继续的通道, 处理基于该选择的通道上通信;  
   当服务器不再运行以后, 需要关闭通道、选择器、全部链接, 释放一切资源  
 Listener的run方法会调用doAccept(), Listener.Reader的run方法会调用doRead().  doAccept()和doRead()都在Listener内.  
-{% highlight java %}
+
+```
   private static final ThreadLocal<Server> SERVER = new ThreadLocal<Server>();
 
   /** Returns the server instance called under or null.  May be called under #call(Writable, long)implementations, 
@@ -503,11 +514,13 @@ Listener的run方法会调用doAccept(), Listener.Reader的run方法会调用doR
       return readers[currentReader];
     }
   }
-{% endhighlight %}
+```
+
 
 ####Listener.Reader
 当Client创建Socket连接, 连接到Server时, Server端的Listener的run方法负责监听客户端的连接, 通过doAccept()接受客户端的连接: 为客户端的连接通道SocketChannel注册读事件OP_READ, 同时给选择键附加Connection对象.  当Client的连接被Server接受后, Client开始向Server发送数据请求(RPC调用), Server.Listener.Reader负责读取客户端的请求数据, Listener本身并不负责读取客户端的请求数据而是交由Reader线程去做. Listener的Reader线程有多个,Reader的run方法通过doRead()从通道的选择键获取附件的Connection对象(在doAccept这一步向Socket通道注册了读事件, 并附件了Connection对象, 所以当有读取事件发生时能从选择键中获取附加的这个对象), 由Connection对象读取和处理数据.  
-{% highlight java %}
+
+```
     private class Reader implements Runnable {
       private volatile boolean adding = false; //读取线程是否正在添加中,如果是,等待一秒钟
       private Selector readSelector = null; //读取线程的Selector选择器
@@ -555,7 +568,8 @@ Listener的run方法会调用doAccept(), Listener.Reader的run方法会调用doR
           return channel.register(readSelector, SelectionKey.OP_READ);  // ③
       }
     }
-{% endhighlight %}
+```
+
 
 
 ####NIO通信流程
