@@ -9,6 +9,7 @@ description:
 
 上篇在解析Schema的时候顺便分析了一些常用的Statement syntax和对应的语法语义解析器/结果,  
 现在继续ApplicationBuilder.buildApplication中parseSchemas的下一步splitOperators.  
+
 ```java
     private void buildApplication() {
         app = new Application(applicationName);
@@ -29,7 +30,8 @@ description:
 combineOperators会创建OperatorCombiner, 并调用combine方法将splitContexts合并起来,终于打印了日志中看到的:`combine all split contexts`(解析submit之后).  
 构建Application的主要工作就是Split和Combine,最后将SplitContext的operators和transitions设置到Application对象中,完成应用程序的构建,在这基础上再进行物理优化.    
 
-第一步就是SplitOperators拆分算子(parseContexts是语义解析器结果列表): 创建对应的Spliter,调用其split方法.     
+第一步就是SplitOperators拆分算子(parseContexts是语义解析器结果列表): 创建对应的Spliter,调用其split方法.   
+
 ```java
     private List<SplitContext> splitOperators() {
         List<SplitContext> splitContexts = Lists.newArrayList();
@@ -46,6 +48,7 @@ combineOperators会创建OperatorCombiner, 并调用combine方法将splitContext
 OperatorSplitter的splitters采用static块提前添加了系统中也有的算子拆分类. 结合上面的splitOperators就是一个双层循环了:  
 针对Application的每一个AnalyzeContext, 判断哪个Splitter可以解析这个AnalyzeContext. 那么会有可能一个AnalyzeContext  
 有多个Splitter吗? 不会的,因为只要一个Splitter验证通过就返回当前Splitter拆分后的SplitContext了(return结束下面的for循环).  
+
 ```java
     public static SplitContext split(BuilderUtils buildUtils, AnalyzeContext parseContext) {
         for (Splitter splitter : splitters) {
@@ -59,6 +62,7 @@ OperatorSplitter的splitters采用static块提前添加了系统中也有的算�
 
 都有哪些Splitter(SelectSplitter抽象类是DataSource,Aggregate,Join的父类,所以不能被实例化):  
 每个具体的Splitter都实现了validate方法根据传入的AnalyzeContext实现类(pContext)用来验证能否进行解析  
+
 ```
 Splitter                                AnalyzeContext
     |-- SelectSplitter                      |-- SelectAnalyzeContext     
@@ -72,6 +76,7 @@ Splitter                                AnalyzeContext
 ```
 
 比如AggregateSplitter的validate方法会验证是不是SelectAnalyzeContext.  
+
 ```java
     public boolean validate(AnalyzeContext parseContext) {
         if (!(parseContext instanceof SelectAnalyzeContext))    return false;
@@ -90,6 +95,7 @@ Splitter                                AnalyzeContext
 ### Input/Output Operator
 
 Input和Output算子的拆分由SourceOperatorSplitter实现: 根据AnalyzeContext创建Operator算子, 即根据语义分析结果拆分内容   
+
 ```java
 public class SourceOperatorSplitter implements Splitter {   //源算子拆分,包括输入算子和输出算子
     private SplitContext result = new SplitContext();
@@ -112,6 +118,7 @@ pipe stream算子属于中间算子，本来是不会对应任何算子，只要
 
 算子要从CreateStreamAnalyzeContext context获取出运行时的数据, context的设值是在语义解析器的analyze时.   
 AnalyzeContext语义解析结果对CQL语法进行解析, 解析出来的数据最终会被用在算子上. 而算子才是构建Application的基础.  
+
 ```java
     private InputStreamOperator createInputSourceOperator() {
         String operatorName = getOperatorName(context.getRecordReaderClassName(),"Input");
@@ -132,6 +139,7 @@ AnalyzeContext语义解析结果对CQL语法进行解析, 解析出来的数据�
 #### Insert Operator
 
 insert into语句的拆分.  
+
 ```java
 public class InsertSplitter implements Splitter {
     private InsertAnalyzeContext context;
@@ -219,6 +227,7 @@ public class InnerFunctionOperator extends Operator {
 #### AggregateSplitter 
 
 AggregateSplitter的父类是SelectSplitter, 而Select包含From子句.  
+
 ```java
     protected void splitFromClause() {
         //获取Select中From子句的语义解析结果
@@ -238,6 +247,7 @@ AggregateSplitter的父类是SelectSplitter, 而Select包含From子句.
 ```
 
 filter before window 语句解析. 根据From子句的语法,流前的过滤: `FROM transform (evnetid>10)[range UNBOUNDED]`. 其中[]表示window, 而[]前面的()则是filter过滤.  
+
 ```java
     protected FilterOperator splitFiterBeforeWindow(String streamName) {
         FromClauseAnalyzeContext clauseContext = getFromClauseContext();
@@ -257,6 +267,7 @@ filter before window 语句解析. 根据From子句的语法,流前的过滤: `F
 ```
 
 拆分AggregateOperator, 因为聚合算子可能包括多种聚合操作, 如果存在则都设置到AggregateOperator对应的字段中.  
+
 ```java
     private AggregateOperator splitAggregateOperator(FromClauseAnalyzeContext clauseContext, String streamName) {
         //创建新的聚合算子
@@ -329,6 +340,7 @@ CQL语句之间的连线，必然从inputStream或者PipeStream发起，连接�
 ### submitApplication 
 
 历经千辛万苦, 终于回到SubmitTask的submitApplication, 创建物理计划Executor,并执行Application.  
+
 ```java
     private void submitApplication() {
         new PhysicalPlanExecutor().execute(context.getApp());
@@ -338,6 +350,7 @@ CQL语句之间的连线，必然从inputStream或者PipeStream发起，连接�
 #### api.Application -> application.Application
 
 api的Application是流处理执行计划应用程序, 封装的是CQL语句构建而成的应用程序:  
+
 ```java
 public class Application {                      
     private String applicationId = null;                    //应用id
@@ -351,7 +364,8 @@ public class Application {
 }
 ```
 
-application.Application针对Schema和算子采用Manager管理类(实际上底层的存储结构都是由Map构成的)来操作:
+application.Application针对Schema和算子采用Manager管理类(实际上底层的存储结构都是由Map构成的)来操作:  
+
 ```java
 public abstract class Application {
     private String appName;                 //应用程序名称
@@ -362,6 +376,7 @@ public abstract class Application {
 ```
 
 OperatorMng管理的算子包括输入算子(addInputStream),输出算子(addOutputStream),功能算子(addFunctionStream).  
+
 ```java
 IRichOperator (com.huawei.streaming.operator)
     AbsOperator (com.huawei.streaming.operator)
@@ -380,6 +395,7 @@ IRichOperator (com.huawei.streaming.operator)
 ```
 
 IRichOperator流处理算子基本接口: 所有的流处理相关的算子实现，都来源于这个算子, 所有的外部Storm实现，均依赖于这个接口  
+
 ```java
 public interface IRichOperator extends IOperator, Configurable{
     String getOperatorId();                     //获取算子id
@@ -393,6 +409,7 @@ public interface IRichOperator extends IOperator, Configurable{
 ```
 
 通过ExecutorPlanGenerator生成的application.Application则是生成可执行的执行计划. 可执行指的是可以运行在Storm引擎.  
+
 ```java
     public void execute(Application apiApplication) {
         parseUserDefineds(apiApplication, isStartFromDriver);
@@ -412,6 +429,7 @@ public interface IRichOperator extends IOperator, Configurable{
 ```
 
 日志中`start to execute application`, 在生成器工作之前会`parseUserDefineds`设置一些用户自定义的准备工作:比如注册jar包,注册函数,打包等发生在parseUserDefineds.    
+
 ```
 2015-11-25 02:32:24 | INFO  | [main] | start to execute application example | com.huawei.streaming.cql.executor.PhysicalPlanExecutor (PhysicalPlanExecutor.java:127)
 2015-11-25 02:32:25 | INFO  | [main] | start to unzip jar stream-storm-1.0-jar-with-dependencies.jar | com.huawei.streaming.cql.executor.mergeuserdefinds.JarExpander (JarExpander.java:79)
@@ -425,6 +443,7 @@ public interface IRichOperator extends IOperator, Configurable{
 #### Schema -> TupleEventType
 
 前面的第一个Topology的CQL语句:  
+
 ```
 CREATE INPUT STREAM s(id INT, name STRING, type INT) SOURCE randomgen PROPERTIES ( timeUnit = "SECONDS", period = "1", eventNumPerperiod = "1", isSchedule = "true" );
 CREATE OUTPUT STREAM rs(type INT, cc INT) SINK consoleOutput;
@@ -435,6 +454,7 @@ WHERE id > 5 GROUP BY type;
 ```
 
 生成可执行计划对应的日志, 会解析schema和算子.   
+
 ```
 2015-11-25 02:32:39 | INFO  | [main] | start to generator executor application for app example | com.huawei.streaming.cql.executor.ExecutorPlanGenerator (ExecutorPlanGenerator.java:102)
 
@@ -462,6 +482,7 @@ WHERE id > 5 GROUP BY type;
 答: 前面只是LazyTask懒解析,其实还是没有开始的. 那为什么要在这里才开始? 因为解析完schema后, 就该轮到operator的解析了.   
 
 生成的可执行计划会解析Application中的Schema和Operators,经过重新组装,设置到可执行的Application中.  
+
 ```java
     public com.huawei.streaming.application.Application generate(Application vap) {
         LOG.info("start to generator executor application for app " + vap.getApplicationId());
@@ -474,7 +495,8 @@ WHERE id > 5 GROUP BY type;
     }
 ```
 
-解析Schema会将Schema转换为IEvent事件: TupleEventType. Schema中的Column会转换为TupleEventType的Attribute.而schemaName仍然不变. 
+解析Schema会将Schema转换为IEvent事件: TupleEventType. Schema中的Column会转换为TupleEventType的Attribute.而schemaName仍然不变.  
+
 ```java
 public class TupleEventType implements IEventType {
     private String name;            //schemaName,表名
@@ -486,6 +508,7 @@ public class TupleEventType implements IEventType {
 ```
 
 Schema的管理类用Map结构保存schemaName/eventTypeName和对应的Schema/TupleEventType: 表名->表结构.   
+
 ```java
 public class EventTypeMng implements Serializable {
     private Map<String, IEventType> schemas;            //MAP: 数据类型名称 => 具体数据类型
@@ -495,7 +518,9 @@ public class EventTypeMng implements Serializable {
     }
 }
 ```
+
 同样算子管理OperatorMng则用三个Map分别管理输入,输出,功能算子. Map的key是operatorId,value是Operator算子本身.   
+
 ```java
 public class OperatorMng{    
     private List<IRichOperator> sortedFunctions;    //DFG排序后的功能算子列表，作为创建Storm拓扑顺序的基础(输出和功能算子组成-->Bolt)
@@ -509,6 +534,7 @@ public class OperatorMng{
 
 算子解析: 这里的解析是为了使得输入和输出算子统一，避免用户自定义和系统内置的算子对外表现不一致处理起来的麻烦  
 由于输入和输出算子中存在特例，即针对文件，tcp，kafka等编写了特例, 所以需要首先将他们抽象化，之后再来处理  
+
 ```java
     private void parseOperators(){
         Map<String, Operator> opts = formatOperators();                     //① 输入输出算子抽象化
@@ -533,9 +559,11 @@ public class OperatorMng{
 ```
 
 Operator是算子, AbsOperator则是流处理算子(继承IRichOperator). 它们的转换由OperatorInfoCreatorFactory.buildStreamOperator完成.   
+
 ![stream-aboperators](http://img.blog.csdn.net/20151127114702874)
 
-combineOperators会将算子用OperatorTransition进行连接: 梳理operatorInfo之间的上下级关系
+combineOperators会将算子用OperatorTransition进行连接: 梳理operatorInfo之间的上下级关系  
+
 ```java
     private void combineOperators(Map<String, AbsOperator> operatorInfos) {
         //算子之间的连接
@@ -558,14 +586,17 @@ combineOperators会将算子用OperatorTransition进行连接: 梳理operatorInf
     }
 ```
 
-FromTransition: 连线的from算子的输出是outputSchema
+FromTransition: 连线的from算子的输出是outputSchema  
+
 ```java
     private void combineFromTransition(Map<String, AbsOperator> operatorInfos, String fromOpId, String streamName, TupleEventType outputSchema){
         sConfig.put(StreamingConfig.STREAMING_INNER_OUTPUT_SCHEMA, outputSchema);
         sConfig.put(StreamingConfig.STREAMING_INNER_OUTPUT_STREAM_NAME, streamName);
     }
 ```
-ToTransition: 连线的to算子的输入是outputSchema. `这里outputSchema命名为schema似乎更好`
+
+ToTransition: 连线的to算子的输入是outputSchema. `这里outputSchema命名为schema似乎更好`  
+
 ```java
     private void combineToTransition(Map<String, AbsOperator> operatorInfos, String toOpId, String streamName,
         DistributeType distributedType, String distributedFields, TupleEventType outputSchema) {
@@ -581,6 +612,7 @@ ToTransition: 连线的to算子的输入是outputSchema. `这里outputSchema命�
 SubmitTask.submitApplication -> PhysicalPlanExecutor.execute -> PhysicalPlanExecutor.submit(application.Application) ->  
 StormApplication.launch -> createTopology 创建拓扑, 对于Storm的程序而言, 构成拓扑的组件包括Spouts和Bolts.  
 这些数据都来自于Application的输入,输出和功能算子. 由于Storm只有两种组件Spout和Bolt, 所以输入算子归于Spout,输出和功能算子都属于Bolt.  
+
 ```java
     private void createSpouts() {
         List< ? extends IRichOperator> sources = getInputStreams(); //获得所有源算子信息: OperatorMng.inputs
@@ -607,6 +639,7 @@ StormApplication.launch -> createTopology 创建拓扑, 对于Storm的程序而�
 
 在开发Storm应用程序时, 一般是在Storm的Topology代码中创建Bolt并直接设置Bolt的分组策略.  
 假设有这样的Topology, Bolt1输出到Bolt3和Bolt4, Bolt2输出到Bolt3(一个Bolt可以有多个输出,也可以由多个输入).    
+
 ```java
              |------ |Bolt4|
 |Bolt1| -----|
@@ -678,6 +711,7 @@ component-id只是用于区别不同的组件,或者用于从哪个输入组件�
 #### Bolt Creation
 
 createBolts设置Operator的分组策略, 首先创建IRichBolt,并返回Bolt的声明BoltDeclarer,以便后续操作可以在BoltDeclarer继续进行(比如上面的分组策略).  
+
 ```java
     private BoltDeclarer createBoltDeclarer(IRichOperator operator){
         IRichBolt bolt;
@@ -701,7 +735,8 @@ createBolts设置Operator的分组策略, 首先创建IRichBolt,并返回Bolt的
 ```
 
 StormSpout,StormBolt,StormOutputBolt都是对Storm的组件的封装. 除了继承各自的IRichSpout和IRichBolt外,还要实现StreamAdapter接口的setOperator方法.  
-流处理算子适配接口: 依靠这个接口，将流处理的算子注入到具体的Storm的Spout/Bolt中. `创建Bolt为啥不用构造函数一句话的事儿: new StormBolt(operator)` 
+流处理算子适配接口: 依靠这个接口，将流处理的算子注入到具体的Storm的Spout/Bolt中. `创建Bolt为啥不用构造函数一句话的事儿: new StormBolt(operator)`  
+
 ```java
 public class StormSpout implements IRichSpout, StreamAdapter {
     private IRichOperator input;
@@ -718,7 +753,8 @@ public class StormOutputBolt implements IRichBolt, StreamAdapter {
 }
 ```
 
-StormBolt的execute方法
+StormBolt的execute方法  
+
 ```java
     public void execute(Tuple input) {
         String sourceStreamName = input.getSourceStreamId();        //获取Tuple的输入流stream-id
